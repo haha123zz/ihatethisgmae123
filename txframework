@@ -1,0 +1,227 @@
+local Players = game:GetService("Players")
+local Client = Players.LocalPlayer
+local Character = Client.Character or Client.CharacterAdded:Wait()
+local Mouse = Client:GetMouse()
+-- Initializing the UI
+local Library = loadstring(game:HttpGet("https://raw.githubusercontent.com/WetCheezit/Bracket-V2/main/src.lua"))()
+local Window, MainUI = Library:CreateWindow("TournamentX Cheats")
+local GunTab, MiscTab = Window:CreateTab("Gun"), Window:CreateTab("Misc")
+local LegitGunGroupbox, BlatantGunGroupbox = GunTab:CreateGroupbox("Legit", "Left"), GunTab:CreateGroupbox("Blatant", "Right")
+local PhysicsGroupBox, OtherGroupBox = MiscTab:CreateGroupbox("Physics", "Left"), MiscTab:CreateGroupbox("Other", "Right")
+
+local InitStats
+-- idk yet what to add for physics
+
+local Settings = {
+    AllHeadshots = false,
+    SilentAim = false,
+    ClipSize = 7,
+    InfiniteJump = false,
+    Ghost = false
+}
+
+LegitGunGroupbox:CreateToggle("All Headshots", function(state)
+    Settings.AllHeadshots = state 
+end)
+
+BlatantGunGroupbox:CreateToggle("Silent Aim", function(state)
+    Settings.SilentAim = state
+end)
+
+BlatantGunGroupbox:CreateSlider("Clip Size (Reload gun after changing)", 1, 9999, Settings.ClipSize, function(state)
+    Settings.ClipSize = state 
+    InitStats()
+end)
+
+BlatantGunGroupbox:CreateButton("Kill all (Have m9 equipped)", function()
+    for _, Player in ipairs(Players:GetPlayers()) do
+        if Player.Character and Player.Character:FindFirstChild("Head") and Player.Character:FindFirstChild("Humanoid") then
+            for i = 1, 6 do
+                game:GetService("ReplicatedStorage").Events.Gun.Damage:FireServer("xHyf86e", Player.Character.Humanoid, Client.Character.M9, tostring(Player), Player.Character.Head, Player.Character.Head.Size, "Semi")
+            end
+        end 
+    end
+end)
+-- 
+
+PhysicsGroupBox:CreateToggle("Infinite Jump", function(state)
+    Settings.InfiniteJump = state   
+end)
+
+OtherGroupBox:CreateToggle("Ghost", function(state)
+    Settings.Ghost = state
+end)
+
+
+
+-- MAIN
+
+
+-- [[ DMG
+
+local function GetDamage(Humanoid, Original)
+    local PartName = tostring(Original)
+
+    if PartName:lower():find('arm') or PartName:lower():find('leg') and Humanoid.Health <= 25 then
+        local RandomInt = math.random(1,2)
+
+        if RandomInt == 1 then
+            return Original
+        else
+            return Humanoid.Parent:FindFirstChild('Head')
+        end
+
+    elseif PartName:lower():find('torso') or PartName:lower():find('rootpart') or PartName:lower():find('hat') and Humanoid.Health > 25 then
+        local RandomInt = math.random(1, 2)
+        
+        if RandomInt == 1 then
+            return Original
+        else
+            return Humanoid.Parent:FindFirstChild('Head')
+        end
+    end
+
+    return Original -- if anything messes up 
+end
+
+
+
+-- [[ STATS
+
+InitStats = function()
+    if Client.Backpack:FindFirstChild("M9") then
+        local M9 = Client.Backpack:FindFirstChild("M9")
+        local GanClient = M9:FindFirstChild("GanClient")
+    
+        if GanClient then
+            local StatModule = GanClient:FindFirstChild("M9")
+    
+            if StatModule then
+                local Stats = require(StatModule)
+
+                Stats.ClipSize = Settings.ClipSize
+            end
+        end 
+        
+    elseif Character:FindFirstChild("M9") then
+        local M9 = Character:FindFirstChild("M9")
+        local GanClient = M9:FindFirstChild("GanClient")
+    
+        if GanClient then
+            local StatModule = GanClient:FindFirstChild("M9")
+    
+            if StatModule then
+                local Stats = require(StatModule)
+                
+                Stats.ClipSize = Settings.ClipSize
+            end
+        end 
+    end 
+end
+
+Client.CharacterAdded:Connect(function(Char)
+    Character = Char  
+    InitStats()
+end)
+
+-- [[ SILENT AIM 
+
+local function ClosestToMouse()
+    local Distance = math.huge -- placehodler 
+    local Target = nil 
+
+    for _, Player in ipairs(Players:GetPlayers()) do
+        if Player ~= Players.LocalPlayer and Player.Character and Player.Character:FindFirstChild('Head') then
+            --if TeamCheck and Player.TeamColor ~= LocalPlayer.TeamColor then
+            local Distance1 = (Players.LocalPlayer.Character.HumanoidRootPart.Position - Player.Character.HumanoidRootPart.Position).magnitude
+            
+            if Player.Character:FindFirstChild('Humanoid') and Player.Character:FindFirstChild('Humanoid').Health > 0 and Distance1 < 99999 then 
+                local ScreenPosition = workspace.CurrentCamera:WorldToScreenPoint(Player.Character.Head.Position)
+                local MouseCheck = (Vector2.new(Mouse.X, Mouse.Y) - Vector2.new(ScreenPosition.X, ScreenPosition.Y)).Magnitude
+        
+                if MouseCheck < Distance then
+                    Target = Player 
+                    Distance = MouseCheck
+                end
+            end
+        end
+    end
+
+
+    return Target
+end
+
+local function GetCharacters()
+    local Characters = {} 
+    
+    for _, Player in ipairs(Players:GetPlayers()) do
+        if Player.Character and Player ~= Players.LocalPlayer then
+            table.insert(Characters, Player.Character)
+        end
+    end
+    
+    return Characters
+end
+
+-- [[ INF JUMP
+game:GetService("UserInputService").JumpRequest:Connect(function()
+    if Settings.InfiniteJump then
+        Character:FindFirstChild("Humanoid"):ChangeState("Jumping")
+    end
+end)
+
+
+-- [[ AFK SPAM 
+
+game:GetService("RunService").RenderStepped:Connect(function()
+    if Settings.Ghost then
+        game:GetService("ReplicatedStorage").Events.Game.AFK:FireServer(true)
+    end
+end)
+
+-- [[ METATABLE HOOKING / BYPASS
+local mt = getrawmetatable(game)
+local backup = mt.__namecall
+local ind = mt.__index
+setreadonly(mt, false)
+
+mt.__namecall = newcclosure(function(self, ...)
+    local args = {...}
+
+    if tostring(self) == "Damage" and getnamecallmethod() == "FireServer" and Settings.AllHeadshots then
+        local NewPart = GetDamage(args[2], args[5])
+        args[5] = NewPart
+        args[6] = NewPart.Size
+
+        return self.FireServer(self, unpack(args))
+    end
+
+    if getnamecallmethod() == 'FindPartOnRayWithIgnoreList' and Settings.SilentAim then
+        args[2] = GetCharacters()
+        return self.FindPartOnRayWithWhitelist(self, unpack(args))
+    end
+    
+    if getnamecallmethod() == "FireServer" and tostring(self) == "Erupt" then
+        -- anticheat tried kick u
+        return 
+    end
+
+
+    return backup(self, ...)
+end)
+
+mt.__index = newcclosure(function(i, v)
+    if i == Mouse and v == 'Hit' and Settings.SilentAim then
+        if ClosestToMouse() then
+            if ClosestToMouse().Character then
+                if ClosestToMouse().Character.Head then
+                   return ClosestToMouse().Character.Head.CFrame  
+                end
+            end
+        end
+    end
+
+    return ind(i, v)
+end)
+
+setreadonly(mt, true)
